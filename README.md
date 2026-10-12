@@ -1,4 +1,4 @@
-# Scarab Monitor
+# ESP32 PC Monitor
 
 Real-time PC metrics on a Waveshare ESP32-S3-Touch-AMOLED-1.75C (466×466 CO5300). Swipe between settings, a clock, weather, and CPU, GPU, RAM, and network pages. The PC side is a TrafficMonitor plugin. USB is used when the cable is plugged in; Bluetooth is used when it is not.
 
