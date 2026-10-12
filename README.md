@@ -108,7 +108,16 @@ idf.py -p COM3 flash
 
 ### TrafficMonitor plugin
 
-The plugin project is `TrafficMonitorPlugin/` (`Esp32Bridge.cpp`, `BleClient.cpp`, `WeatherClient.cpp`). It runs inside [TrafficMonitor](https://github.com/zhongyang219/TrafficMonitor). Build `Esp32Monitor.dll` with MSVC (C++17) and place it at:
+The plugin project is `TrafficMonitorPlugin/` (`Esp32Bridge.cpp`, `BleClient.cpp`, `WeatherClient.cpp`). It runs inside [TrafficMonitor](https://github.com/zhongyang219/TrafficMonitor).
+
+Build `Esp32Monitor.dll` from the **x64 Native Tools Command Prompt for VS 2022** (C++17). That prompt puts the Windows SDK C++/WinRT headers (`cppwinrt`) on the include path; the Bluetooth and location code needs them.
+
+```bat
+cd TrafficMonitorPlugin
+cl /nologo /LD /O2 /EHsc /MD /std:c++17 /utf-8 /W3 Esp32Bridge.cpp WeatherClient.cpp BleClient.cpp /Fe:Esp32Monitor.dll /link /MACHINE:X64 user32.lib powrprof.lib wtsapi32.lib ws2_32.lib winhttp.lib iphlpapi.lib secur32.lib crypt32.lib windowsapp.lib ole32.lib setupapi.lib
+```
+
+`BluetoothApis.lib` and the other system libraries named in the sources are pulled in by `#pragma comment(lib)`. Copy the DLL to:
 
 ```
 C:\Program Files\TrafficMonitor\plugins\Esp32Monitor.dll
