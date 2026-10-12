@@ -26,7 +26,7 @@ Swipe left or right. Each picture is the round 466 glass, with the bezel around 
 
 Settings is not part of the automatic cycle. With auto-switch on, the board walks clock → weather → CPU → GPU → RAM → network → clock. The last page and the switch interval are kept in `/storage`.
 
-The face is inspired by BALMUDA. The word in the center is THE CLOCK. The clock accepts a new time stamp on the first packet, then once an hour, and also when civil time jumps by 2 seconds or more. The stamp is network time at the weather location (Open-Meteo), not the PC clock. Until the first weather sample, the plugin sends the PC's local time. Until sunrise and sunset are known, day and night fall back to 06:00–18:00.
+The face is inspired by BALMUDA. The word in the center is THE CLOCK. Part of the clock face and its code follows [PC-Monitor](https://github.com/dragoncraft87/PC-Monitor). The clock accepts a new time stamp on the first packet, then once an hour, and also when civil time jumps by 2 seconds or more. The stamp is network time at the weather location (Open-Meteo), not the PC clock. Until the first weather sample, the plugin sends the PC's local time. Until sunrise and sunset are known, day and night fall back to 06:00–18:00.
 
 ## Connection
 
