@@ -8,17 +8,17 @@ Swipe left or right. Each picture is the round 466 glass, with the bezel around 
 
 <table>
   <tr>
-    <td width="240" align="center"><b>Settings</b><br>Brightness, auto-switch, USB / Bluetooth / battery<br><img src="docs/screens/settings.png" width="220" height="220" alt="Settings"></td>
-    <td width="240" align="center"><b>Clock</b><br>Analog face inspired by BALMUDA. The center word is THE CLOCK. Sun and moon follow today's sunrise and sunset<br><img src="docs/screens/clock.png" width="220" height="220" alt="Clock"></td>
-    <td width="240" align="center"><b>Weather</b><br>Temperature, condition, humidity<br><img src="docs/screens/weather.png" width="220" height="220" alt="Weather"></td>
+    <td width="240" align="center" valign="top"><img src="docs/screens/settings.png" width="220" height="220" alt="Settings"><br><b>Settings</b><br>Brightness, auto-switch, USB / Bluetooth / battery</td>
+    <td width="240" align="center" valign="top"><img src="docs/screens/clock.png" width="220" height="220" alt="Clock"><br><b>Clock</b><br>Analog face inspired by BALMUDA. The center word is THE CLOCK. Sun and moon follow today's sunrise and sunset</td>
+    <td width="240" align="center" valign="top"><img src="docs/screens/weather.png" width="220" height="220" alt="Weather"><br><b>Weather</b><br>Temperature, condition, humidity</td>
   </tr>
   <tr>
-    <td width="240" align="center"><b>CPU</b><br>Load and temperature<br><img src="docs/screens/cpu.png" width="220" height="220" alt="CPU"></td>
-    <td width="240" align="center"><b>GPU</b><br>Load, temperature, VRAM<br><img src="docs/screens/gpu.png" width="220" height="220" alt="GPU"></td>
-    <td width="240" align="center"><b>RAM</b><br>Used / total<br><img src="docs/screens/ram.png" width="220" height="220" alt="RAM"></td>
+    <td width="240" align="center" valign="top"><img src="docs/screens/cpu.png" width="220" height="220" alt="CPU"><br><b>CPU</b><br>Load and temperature</td>
+    <td width="240" align="center" valign="top"><img src="docs/screens/gpu.png" width="220" height="220" alt="GPU"><br><b>GPU</b><br>Load, temperature, VRAM</td>
+    <td width="240" align="center" valign="top"><img src="docs/screens/ram.png" width="220" height="220" alt="RAM"><br><b>RAM</b><br>Used / total</td>
   </tr>
   <tr>
-    <td width="240" align="center"><b>Network</b><br>Link and live up / down rates<br><img src="docs/screens/network.png" width="220" height="220" alt="Network"></td>
+    <td width="240" align="center" valign="top"><img src="docs/screens/network.png" width="220" height="220" alt="Network"><br><b>Network</b><br>Link and live up / down rates</td>
     <td width="240"></td>
     <td width="240"></td>
   </tr>
