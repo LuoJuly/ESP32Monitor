@@ -447,6 +447,13 @@ static void rotate_finish_gesture(void)
 
     lv_obj_stop_scroll_anim(s_tileview);
     lv_tileview_set_tile_by_index(s_tileview, (uint32_t)target, 0, LV_ANIM_OFF);
+    /* LVGL starts the snap animation after RELEASED, from the scroll object
+     * it saved before this callback. Drop that scroll so the snap cannot
+     * pull the strip on past the page just committed. */
+    if (indev) {
+        indev->pointer.scroll_obj = NULL;
+        indev->pointer.scroll_dir = LV_DIR_NONE;
+    }
 }
 
 /* Does not stop or rewind a scroll while the finger is down. */
@@ -531,6 +538,12 @@ static void rotate_poll(uint32_t now)
         return;
     }
     if (s_rotate_ms == 0) s_rotate_ms = now;
+    /* `now` was sampled before this task took the LVGL lock. A swipe that
+     * finishes while it is waiting stamps s_rotate_ms in the future. The
+     * unsigned subtract then wraps, and the cycle steps once more on top of
+     * the swipe: left lands two pages ahead, right is pulled back onto the
+     * page the finger just left. */
+    if ((int32_t)(now - s_rotate_ms) < 0) return;
     if ((uint32_t)(now - s_rotate_ms) < (uint32_t)s_rotate_s * 1000u) return;
 
     int next = page + 1;
