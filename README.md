@@ -4,7 +4,7 @@ Real-time PC metrics on a Waveshare ESP32-S3-Touch-AMOLED-1.75C (466×466 CO5300
 
 ## Screens
 
-Swipe left or right.
+Swipe left or right. Each picture is the round 466 glass, with the bezel around the circle.
 
 <table>
   <tr>
