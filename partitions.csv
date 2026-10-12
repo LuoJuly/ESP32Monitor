@@ -1,15 +1,12 @@
-# PC Monitor - Custom Partition Table (ESP32-S3 N16R8 - 16MB Flash)
+# PC Monitor on Waveshare ESP32-S3-Touch-AMOLED-1.75C (32MB flash)
 # =============================================================================
-# OTA layout (v2.4): two app slots so firmware can be updated over USB serial
-# by the companion app (FW_BEGIN/FW_DATA/FW_END protocol) - no cable reflash.
-# NOTE: Changing to this table requires ONE final manual flash via idf.py.
-#       The storage partition moved (0x820000), so LittleFS content is reset
-#       once; it auto-formats on first boot and can be re-provisioned via app.
+# Two OTA slots so the companion app can push firmware over USB serial.
+# Storage is LittleFS and is not erased by an app-slot update.
 # =============================================================================
 # Name,Type,SubType,Offset,Size,Flags
 nvs,data,nvs,0x9000,0x6000,
 otadata,data,ota,0xf000,0x2000,
 phy_init,data,phy,0x11000,0x1000,
-ota_0,app,ota_0,0x20000,4M,
-ota_1,app,ota_1,0x420000,4M,
-storage,data,littlefs,0x820000,0x7E0000,
+ota_0,app,ota_0,0x20000,6M,
+ota_1,app,ota_1,0x620000,6M,
+storage,data,littlefs,0xC20000,0x13E0000,

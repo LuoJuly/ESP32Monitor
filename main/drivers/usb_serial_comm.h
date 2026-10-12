@@ -59,6 +59,27 @@ void usb_serial_register_handler(usb_cmd_handler_t handler);
  * @brief Send response string via USB Serial
  * @param response String to send (will be sent as-is)
  */
+/**
+ * @brief Dispatch one complete line (no newline). USB and Bluetooth both use this.
+ */
+void usb_serial_handle_line(const char *line);
+
+/**
+ * Same as usb_serial_handle_line. from_ble is remembered when a sample
+ * is accepted, so the settings page can show which link is carrying data.
+ */
+void usb_serial_handle_line_from(const char *line, bool from_ble);
+
+/** 0 none, 1 USB, 2 Bluetooth. */
+int usb_serial_transport(void);
+
+/**
+ * @brief Extra transmitter. Bluetooth notifications register here so replies
+ * leave on whichever link is up.
+ */
+typedef void (*usb_serial_tx_fn)(const char *data, size_t len);
+void usb_serial_set_tx_fn(usb_serial_tx_fn fn);
+
 void usb_serial_send(const char *response);
 
 /**

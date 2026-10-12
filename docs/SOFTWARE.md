@@ -55,10 +55,11 @@ If you just want to use the pre-built exe:
 
 ### Prerequisites
 
-- ESP-IDF v5.0 or higher
+- ESP-IDF v5.5 or higher (required by the Waveshare 1.75C board package)
 - Python 3.8+
 - Git
 - USB cable
+- Waveshare ESP32-S3-Touch-AMOLED-1.75C
 
 ### Install ESP-IDF (Windows)
 
@@ -81,7 +82,7 @@ mkdir -p ~/esp
 cd ~/esp
 git clone --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
-git checkout v5.1
+git checkout v5.5.5
 
 # Install
 ./install.sh esp32s3
@@ -123,15 +124,10 @@ idf.py -p COM3 flash monitor
 ### Expected Output
 
 ```
-I (123) PC-MONITOR: === PC Monitor 4x Display with LVGL ===
-I (234) PC-MONITOR: ESP32-S3 N16R8 with PSRAM
-I (345) PC-MONITOR: Initializing SPI bus...
-I (456) LVGL: Initializing GC9A01 displays...
-I (567) LVGL: Display 1 (CPU) initialized
-I (678) LVGL: Display 2 (GPU) initialized
-I (789) LVGL: Display 3 (RAM) initialized
-I (890) LVGL: Display 4 (Network) initialized
-I (991) PC-MONITOR: === System ready! ===
+I (xx) MAIN: PC Monitor - Waveshare AMOLED 1.75C v2.5
+I (xx) MAIN: AMOLED ready: 466x466
+I (xx) MAIN: Dashboard ready (CPU GPU / RAM NET)
+I (xx) MAIN: System ready. Waiting for USB data...
 ```
 
 Press `Ctrl + ]` to exit monitor.

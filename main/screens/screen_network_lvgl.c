@@ -11,14 +11,18 @@
 
 #include "screens_lvgl.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* Widget handles and NETWORK_HISTORY_SIZE defined in screens_lvgl.h */
 
-screen_network_t *screen_network_create(lv_display_t *disp)
+screen_network_t *screen_network_create(lv_obj_t *parent)
 {
     screen_network_t *s = malloc(sizeof(screen_network_t));
-    if (!s) return NULL;
+    if (!s || !parent) {
+        free(s);
+        return NULL;
+    }
 
     s->history_index = 0;
     s->last_down = SCREEN_VALUE_SENTINEL;
@@ -26,13 +30,7 @@ screen_network_t *screen_network_create(lv_display_t *disp)
     s->last_type[0] = '\0';
     s->last_speed[0] = '\0';
 
-    /* Set this display as default temporarily */
-    lv_display_t *old_default = lv_display_get_default();
-    lv_display_set_default(disp);
-
-    /* Create screen */
-    s->screen = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(s->screen, lv_color_black(), 0);
+    s->screen = screen_panel_create(parent);
 
     /* ========================================================================
      * HEADER LABELS
@@ -41,30 +39,30 @@ screen_network_t *screen_network_create(lv_display_t *disp)
     /* "NETWORK.SYS" Header */
     s->label_header = lv_label_create(s->screen);
     lv_label_set_text(s->label_header, "NETWORK");
-    lv_obj_set_style_text_font(s->label_header, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(s->label_header, &lv_font_montserrat_20, 0);
     lv_obj_set_style_text_color(s->label_header, lv_color_make(0x00, 0xff, 0xff), 0);
-    lv_obj_align(s->label_header, LV_ALIGN_TOP_MID, 0, 25);
+    lv_obj_align(s->label_header, LV_ALIGN_TOP_MID, 0, 22);
 
     /* Connection Type (LAN/WiFi) */
     s->label_conn_type = lv_label_create(s->screen);
     lv_label_set_text(s->label_conn_type, "LAN");
-    lv_obj_set_style_text_font(s->label_conn_type, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(s->label_conn_type, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(s->label_conn_type, lv_color_make(0x00, 0xff, 0xff), 0);
-    lv_obj_align(s->label_conn_type, LV_ALIGN_TOP_MID, 0, 45);
+    lv_obj_align(s->label_conn_type, LV_ALIGN_TOP_MID, 0, 52);
 
     /* Speed Indicator */
     s->label_speed = lv_label_create(s->screen);
     lv_label_set_text(s->label_speed, "1000 Mbps");
-    lv_obj_set_style_text_font(s->label_speed, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(s->label_speed, &lv_font_montserrat_22, 0);
     lv_obj_set_style_text_color(s->label_speed, lv_color_make(0xff, 0x00, 0xff), 0);
-    lv_obj_align(s->label_speed, LV_ALIGN_TOP_MID, 0, 68);
+    lv_obj_align(s->label_speed, LV_ALIGN_TOP_MID, 0, 96);
 
     /* ========================================================================
      * CHART WIDGET (Traffic Graph)
      * ====================================================================== */
     s->chart = lv_chart_create(s->screen);
-    lv_obj_set_size(s->chart, 180, 60);
-    lv_obj_align(s->chart, LV_ALIGN_CENTER, 0, 10);
+    lv_obj_set_size(s->chart, 420, 170);
+    lv_obj_align(s->chart, LV_ALIGN_CENTER, 0, 16);
 
     lv_chart_set_type(s->chart, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(s->chart, NETWORK_HISTORY_SIZE);
@@ -93,27 +91,20 @@ screen_network_t *screen_network_create(lv_display_t *disp)
     /* Download Speed - Center Bottom (first line) */
     s->label_down = lv_label_create(s->screen);
     lv_label_set_text(s->label_down, "DN: 0 MB/s");
-    lv_obj_set_style_text_font(s->label_down, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s->label_down, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(s->label_down, lv_color_make(0x00, 0xff, 0xff), 0);
     lv_obj_set_style_text_align(s->label_down, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(s->label_down, LV_ALIGN_BOTTOM_MID, 0, -35);
+    lv_obj_align(s->label_down, LV_ALIGN_BOTTOM_MID, 0, -78);
 
     /* Upload Speed - Center Bottom (second line) */
     s->label_up = lv_label_create(s->screen);
     lv_label_set_text(s->label_up, "UP: 0 MB/s");
-    lv_obj_set_style_text_font(s->label_up, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s->label_up, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(s->label_up, lv_color_make(0xff, 0x00, 0xff), 0);
     lv_obj_set_style_text_align(s->label_up, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(s->label_up, LV_ALIGN_BOTTOM_MID, 0, -15);
+    lv_obj_align(s->label_up, LV_ALIGN_BOTTOM_MID, 0, -32);
 
-    /* Load screen to this display */
-    lv_screen_load(s->screen);
-
-    /* Restore previous default display */
-    if (old_default) {
-        lv_display_set_default(old_default);
-    }
-
+    screen_pass_swipe(s->screen);
     return s;
 }
 
@@ -156,9 +147,14 @@ void screen_network_update(screen_network_t *s, const pc_stats_t *stats)
         lv_label_set_text(s->label_down, "DN: N/A");
         lv_obj_set_style_text_color(s->label_down, lv_color_hex(0xFF4444), 0);
     } else {
-        char down_buf[16];
+    /* Below 1 MB/s the MB figure rounds to 0.0, so show KB/s instead. */
+    char down_buf[24];
+    if (stats->net_down_mbps < 1.0f) {
+        snprintf(down_buf, sizeof(down_buf), "DN: %.0f KB/s", stats->net_down_mbps * 1024.0f);
+    } else {
         snprintf(down_buf, sizeof(down_buf), "DN: %.1f MB/s", stats->net_down_mbps);
-        lv_label_set_text(s->label_down, down_buf);
+    }
+    lv_label_set_text(s->label_down, down_buf);
         lv_obj_set_style_text_color(s->label_down, lv_color_make(0x00, 0xff, 0xff), 0); /* Cyan */
     }
 
@@ -168,9 +164,13 @@ void screen_network_update(screen_network_t *s, const pc_stats_t *stats)
         lv_label_set_text(s->label_up, "UP: N/A");
         lv_obj_set_style_text_color(s->label_up, lv_color_hex(0xFF4444), 0);
     } else {
-        char up_buf[16];
+    char up_buf[24];
+    if (stats->net_up_mbps < 1.0f) {
+        snprintf(up_buf, sizeof(up_buf), "UP: %.0f KB/s", stats->net_up_mbps * 1024.0f);
+    } else {
         snprintf(up_buf, sizeof(up_buf), "UP: %.1f MB/s", stats->net_up_mbps);
-        lv_label_set_text(s->label_up, up_buf);
+    }
+    lv_label_set_text(s->label_up, up_buf);
         lv_obj_set_style_text_color(s->label_up, lv_color_make(0xff, 0x00, 0xff), 0); /* Magenta */
     }
 
@@ -180,8 +180,9 @@ void screen_network_update(screen_network_t *s, const pc_stats_t *stats)
     float down_val = (stats->net_down_mbps >= 0.0f) ? stats->net_down_mbps : 0.0f;
     float up_val = (stats->net_up_mbps >= 0.0f) ? stats->net_up_mbps : 0.0f;
 
-    int down_scaled = (int)((down_val / 125.0f) * 100.0f);
-    int up_scaled = (int)((up_val / 125.0f) * 100.0f);
+    /* 5 MB/s fills the chart, so ordinary KB/s traffic is still visible. */
+    int down_scaled = (int)((down_val / 5.0f) * 100.0f);
+    int up_scaled = (int)((up_val / 5.0f) * 100.0f);
 
     if (down_scaled > 100) down_scaled = 100;
     if (up_scaled > 100) up_scaled = 100;

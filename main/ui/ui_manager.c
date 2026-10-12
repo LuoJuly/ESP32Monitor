@@ -8,10 +8,12 @@
 #include "../gui_settings.h"
 #include "../storage/hw_identity.h"
 #include "../screens/screens_lvgl.h"
+#include "bsp/esp32_s3_touch_amoled_1_75c.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include "esp_log.h"
+#include "esp_err.h"
 
 static const char *TAG = "UI-MGR";
 
@@ -19,7 +21,6 @@ static const char *TAG = "UI-MGR";
 static ui_screens_t *s_screens = NULL;
 static ui_screensavers_t *s_screensavers = NULL;
 static ui_status_dots_t *s_dots = NULL;
-static SemaphoreHandle_t s_lvgl_mutex = NULL;
 static bool s_screensaver_active = false;
 
 /* Screensaver image widget handles (for hot-swap updates) */
@@ -35,17 +36,12 @@ static uint32_t s_lock_successes = 0;
 
 bool ui_acquire_lock(uint32_t timeout_ms)
 {
-    if (!s_lvgl_mutex) {
-        ESP_LOGE(TAG, "UI Lock: Mutex not initialized!");
-        return false;
-    }
-
-    if (xSemaphoreTake(s_lvgl_mutex, pdMS_TO_TICKS(timeout_ms)) == pdTRUE) {
+    /* Same mutex the Waveshare LVGL adapter task uses. */
+    if (bsp_display_lock(timeout_ms) == ESP_OK) {
         s_lock_successes++;
         return true;
     }
 
-    /* Lock timeout - FAIL-SAFE: Skip update, don't freeze! */
     s_lock_timeouts++;
     ESP_LOGW(TAG, "UI Lock Timeout (%lu ms)! Skipping update. [timeouts: %lu, successes: %lu]",
              (unsigned long)timeout_ms, (unsigned long)s_lock_timeouts, (unsigned long)s_lock_successes);
@@ -54,9 +50,7 @@ bool ui_acquire_lock(uint32_t timeout_ms)
 
 void ui_release_lock(void)
 {
-    if (s_lvgl_mutex) {
-        xSemaphoreGive(s_lvgl_mutex);
-    }
+    bsp_display_unlock();
 }
 
 /* =============================================================================
@@ -65,7 +59,7 @@ void ui_release_lock(void)
 
 void ui_manager_init(SemaphoreHandle_t lvgl_mutex)
 {
-    s_lvgl_mutex = lvgl_mutex;
+    (void)lvgl_mutex;
     ESP_LOGI(TAG, "UI Manager initialized");
 }
 
@@ -215,6 +209,8 @@ void ui_manager_update_screens(const pc_stats_t *stats)
     if (s_screens->gpu) screen_gpu_update(s_screens->gpu, stats);
     if (s_screens->ram) screen_ram_update(s_screens->ram, stats);
     if (s_screens->network) screen_network_update(s_screens->network, stats);
+    if (s_screens->weather) screen_weather_update(s_screens->weather, stats);
+    if (s_screens->clock) screen_clock_update(s_screens->clock, stats);
 }
 
 /* =============================================================================
@@ -247,11 +243,15 @@ void ui_manager_show_status_dots(bool show)
         if (s_dots->gpu) lv_obj_clear_flag(s_dots->gpu, LV_OBJ_FLAG_HIDDEN);
         if (s_dots->ram) lv_obj_clear_flag(s_dots->ram, LV_OBJ_FLAG_HIDDEN);
         if (s_dots->net) lv_obj_clear_flag(s_dots->net, LV_OBJ_FLAG_HIDDEN);
+        if (s_dots->weather) lv_obj_clear_flag(s_dots->weather, LV_OBJ_FLAG_HIDDEN);
+        if (s_dots->clock) lv_obj_clear_flag(s_dots->clock, LV_OBJ_FLAG_HIDDEN);
     } else {
         if (s_dots->cpu) lv_obj_add_flag(s_dots->cpu, LV_OBJ_FLAG_HIDDEN);
         if (s_dots->gpu) lv_obj_add_flag(s_dots->gpu, LV_OBJ_FLAG_HIDDEN);
         if (s_dots->ram) lv_obj_add_flag(s_dots->ram, LV_OBJ_FLAG_HIDDEN);
         if (s_dots->net) lv_obj_add_flag(s_dots->net, LV_OBJ_FLAG_HIDDEN);
+        if (s_dots->weather) lv_obj_add_flag(s_dots->weather, LV_OBJ_FLAG_HIDDEN);
+        if (s_dots->clock) lv_obj_add_flag(s_dots->clock, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -387,10 +387,10 @@ bool ui_manager_handle_color_command(const char *line)
     }
 
     /* Apply theme if needed (must be done in LVGL context) */
-    if (needs_theme_update && s_lvgl_mutex) {
-        if (xSemaphoreTake(s_lvgl_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (needs_theme_update) {
+        if (ui_acquire_lock(100)) {
             ui_manager_apply_theme();
-            xSemaphoreGive(s_lvgl_mutex);
+            ui_release_lock();
         }
     }
 
@@ -412,7 +412,8 @@ lv_obj_t *ui_manager_create_status_dot(lv_obj_t *parent)
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(dot, 1, 0);
     lv_obj_set_style_border_color(dot, lv_color_white(), 0);
-    lv_obj_align(dot, LV_ALIGN_BOTTOM_MID, 0, -10);
+    /* Below the top of the circle so it clears the title, still inside the ring. */
+    lv_obj_align(dot, LV_ALIGN_CENTER, 0, -156);
     lv_obj_add_flag(dot, LV_OBJ_FLAG_HIDDEN);
 
     return dot;
@@ -425,7 +426,7 @@ lv_obj_t *ui_manager_create_screensaver_ex(lv_obj_t *parent, lv_color_t bg_color
 
     /* Fullscreen overlay container */
     lv_obj_t *overlay = lv_obj_create(parent);
-    lv_obj_set_size(overlay, 240, 240);
+    lv_obj_set_size(overlay, LV_PCT(100), LV_PCT(100));
     lv_obj_set_pos(overlay, 0, 0);
     lv_obj_set_style_bg_color(overlay, bg_color, 0);
     lv_obj_set_style_bg_opa(overlay, LV_OPA_COVER, 0);

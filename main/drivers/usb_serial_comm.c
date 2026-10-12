@@ -7,10 +7,13 @@
 #include "../storage/hw_identity.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_vfs.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_task_wdt.h"
@@ -29,9 +32,21 @@ static const char *TAG = "USB-COMM";
  * sustained outage (sensor really gone) is shown as N/A. */
 #define HOLD_MAX_PACKETS  4
 
+/* Routine resync is once an hour. CLK is network civil time at the
+ * weather fix. The 40 MHz crystal runs the dial between syncs; at
+ * 20 ppm an hour is about 70 ms, inside one second. The stamp has no
+ * milliseconds, so a one-second disagreement is just sampling. Two
+ * seconds means the source actually moved, and that is applied at once. */
+#define CLK_RESYNC_MS        (3600UL * 1000UL)
+#define CLK_STEP_SEC         2
+
 /* Global state */
-static pc_stats_t s_pc_stats = {0};
+static pc_stats_t s_pc_stats = {
+    .clock_sec = -1,
+};
 static volatile uint32_t s_last_data_ms = 0;
+static bool s_rx_is_ble;
+static volatile int s_transport;
 static SemaphoreHandle_t s_stats_mutex = NULL;
 static uint32_t s_stats_mutex_timeouts = 0;
 
@@ -39,6 +54,34 @@ static uint32_t s_stats_mutex_timeouts = 0;
 static struct {
     uint8_t cpu_pct, cpu_temp, gpu_pct, gpu_temp, vram, ram, net_dn, net_up;
 } s_hold = {0};
+
+/* True when this CLK stamp should replace the crystal time base. */
+static bool clock_accept_sync(int32_t pc_sec)
+{
+    if (s_pc_stats.clock_sec < 0) return true;
+
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+    uint32_t elapsed = now - s_pc_stats.clock_sync_ms;
+    if (elapsed >= CLK_RESYNC_MS) return true;
+
+    int32_t crystal = s_pc_stats.clock_sec + (int32_t)(elapsed / 1000);
+    crystal %= 86400;
+    if (crystal < 0) crystal += 86400;
+    int32_t diff = pc_sec - crystal;
+    if (diff > 43200) diff -= 86400;
+    if (diff < -43200) diff += 86400;
+    if (diff < 0) diff = -diff;
+    return diff >= CLK_STEP_SEC;
+}
+
+static void clock_keep_last(pc_stats_t *dst)
+{
+    dst->clock_sec = s_pc_stats.clock_sec;
+    dst->clock_sync_ms = s_pc_stats.clock_sync_ms;
+    dst->clock_year = s_pc_stats.clock_year;
+    dst->clock_mon = s_pc_stats.clock_mon;
+    dst->clock_day = s_pc_stats.clock_day;
+}
 
 /* If the new field is N/A (<0) and we haven't held too long, keep the old
  * value; otherwise accept the new value and reset the counter. */
@@ -70,7 +113,19 @@ esp_err_t usb_serial_init(void)
     };
 
     esp_err_t ret = usb_serial_jtag_driver_install(&usb_cfg);
+    /* The USB console on this board may already own the driver. */
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ret = ESP_OK;
+    }
+    s_pc_stats.weather_temp = -999;
+    s_pc_stats.weather_code = -1;
+    s_pc_stats.weather_hum = -1;
+    s_pc_stats.sun_rise_min = -1;
+    s_pc_stats.sun_set_min = -1;
+
     if (ret == ESP_OK) {
+        /* Console output otherwise touches the FIFO directly and drops host bytes. */
+        usb_serial_jtag_vfs_use_driver();
         ESP_LOGI(TAG, "USB Serial JTAG initialized");
     } else {
         ESP_LOGE(TAG, "USB Serial JTAG init failed: %s", esp_err_to_name(ret));
@@ -104,11 +159,19 @@ void usb_serial_register_handler(usb_cmd_handler_t handler)
  * SEND FUNCTIONS
  * ========================================================================== */
 
+static usb_serial_tx_fn s_tx_fn;
+
+void usb_serial_set_tx_fn(usb_serial_tx_fn fn)
+{
+    s_tx_fn = fn;
+}
+
 void usb_serial_send(const char *response)
 {
     if (response) {
         size_t len = strlen(response);
         usb_serial_jtag_write_bytes((const uint8_t *)response, len, pdMS_TO_TICKS(100));
+        if (s_tx_fn && len) s_tx_fn(response, len);
     }
 }
 
@@ -122,6 +185,7 @@ void usb_serial_sendf(const char *fmt, ...)
 
     if (len > 0) {
         usb_serial_jtag_write_bytes((const uint8_t *)buf, len, pdMS_TO_TICKS(100));
+        if (s_tx_fn) s_tx_fn(buf, (size_t)len);
     }
 }
 
@@ -133,14 +197,23 @@ static void parse_pc_data(const char *line)
 {
     if (!line || strlen(line) < 5) return;
 
-    /* Make a mutable copy for strtok */
-    char buffer[USB_LINE_BUFFER_SIZE];
+    /* Static: this 4KB buffer does not fit on the RX task stack. */
+    static char buffer[USB_LINE_BUFFER_SIZE];
     strncpy(buffer, line, sizeof(buffer) - 1);
     buffer[sizeof(buffer) - 1] = '\0';
 
     /* Parse into temporary struct first to avoid partial updates */
     pc_stats_t temp_stats = {0};
+    temp_stats.weather_temp = -999;
+    temp_stats.weather_code = -1;
+    temp_stats.weather_hum = -1;
+    temp_stats.sun_rise_min = -1;
+    temp_stats.sun_set_min = -1;
+    temp_stats.clock_sec = -1;
     int fields_parsed = 0;
+    bool saw_weather = false;
+    bool saw_sun = false;
+    bool saw_clock = false;
     char *token = strtok(buffer, ",");
 
     while (token != NULL) {
@@ -194,6 +267,50 @@ static void parse_pc_data(const char *line)
             temp_stats.net_up_mbps = atof(token + 3);
             fields_parsed++;
         }
+        else if (strncmp(token, "WTEMP:", 6) == 0) {
+            temp_stats.weather_temp = (int16_t)atoi(token + 6);
+            saw_weather = true;
+        }
+        else if (strncmp(token, "WCODE:", 6) == 0) {
+            temp_stats.weather_code = (int16_t)atoi(token + 6);
+            saw_weather = true;
+        }
+        else if (strncmp(token, "WHUM:", 5) == 0) {
+            temp_stats.weather_hum = (int16_t)atoi(token + 5);
+            saw_weather = true;
+        }
+        else if (strncmp(token, "WCITY:", 6) == 0) {
+            const char *city = token + 6;
+            if (city[0] && strcmp(city, "-") != 0) {
+                snprintf(temp_stats.weather_city, sizeof(temp_stats.weather_city), "%s", city);
+            }
+            saw_weather = true;
+        }
+        else if (strncmp(token, "SRISE:", 6) == 0) {
+            int mins = atoi(token + 6);
+            if (mins >= 0 && mins <= 24 * 60) temp_stats.sun_rise_min = (int16_t)mins;
+            saw_sun = true;
+        }
+        else if (strncmp(token, "SSET:", 5) == 0) {
+            int mins = atoi(token + 5);
+            if (mins >= 0 && mins <= 24 * 60) temp_stats.sun_set_min = (int16_t)mins;
+            saw_sun = true;
+        }
+        else if (strncmp(token, "CLK:", 4) == 0) {
+            int year, mon, day, hour, min, sec;
+            if (sscanf(token + 4, "%d-%d-%dT%d:%d:%d",
+                       &year, &mon, &day, &hour, &min, &sec) == 6 &&
+                mon >= 1 && mon <= 12 && day >= 1 && day <= 31 &&
+                hour >= 0 && hour <= 23 && min >= 0 && min <= 59 &&
+                sec >= 0 && sec <= 59) {
+                temp_stats.clock_year = (int16_t)year;
+                temp_stats.clock_mon = (int8_t)mon;
+                temp_stats.clock_day = (int8_t)day;
+                temp_stats.clock_sec = hour * 3600 + min * 60 + sec;
+                temp_stats.clock_sync_ms = (uint32_t)(esp_timer_get_time() / 1000);
+                saw_clock = true;
+            }
+        }
 
         token = strtok(NULL, ",");
     }
@@ -231,9 +348,29 @@ static void parse_pc_data(const char *line)
                 s_hold.ram = 0;
             }
 
+            /* Weather rides along every sample. A packet without it keeps
+             * the last reading instead of flashing back to N/A. */
+            if (!saw_weather) {
+                temp_stats.weather_temp = s_pc_stats.weather_temp;
+                temp_stats.weather_code = s_pc_stats.weather_code;
+                temp_stats.weather_hum = s_pc_stats.weather_hum;
+                memcpy(temp_stats.weather_city, s_pc_stats.weather_city, sizeof(temp_stats.weather_city));
+            }
+            if (!saw_sun) {
+                temp_stats.sun_rise_min = s_pc_stats.sun_rise_min;
+                temp_stats.sun_set_min = s_pc_stats.sun_set_min;
+            }
+            /* Between syncs the dial keeps the last stamp and advances it
+             * with esp_timer, which follows the 40 MHz crystal. */
+            if (!saw_clock || !clock_accept_sync(temp_stats.clock_sec)) {
+                clock_keep_last(&temp_stats);
+            }
+
             s_pc_stats = temp_stats;
             s_last_data_ms = (uint32_t)(esp_timer_get_time() / 1000);
+            s_transport = s_rx_is_ble ? 2 : 1;
             xSemaphoreGive(s_stats_mutex);
+            usb_serial_sendf("DATA_OK:%d\n", (int)temp_stats.cpu_percent);
             ESP_LOGD(TAG, "Parsed %d fields, timestamp updated", fields_parsed);
         } else {
             /* Fail-safe: Skip this update, don't freeze! */
@@ -249,6 +386,29 @@ static void parse_pc_data(const char *line)
 /* =============================================================================
  * HANDSHAKE HANDLER (built-in)
  * ========================================================================== */
+
+static bool handle_handshake(const char *line);
+
+int usb_serial_transport(void)
+{
+    return s_transport;
+}
+
+void usb_serial_handle_line(const char *line)
+{
+    usb_serial_handle_line_from(line, false);
+}
+
+void usb_serial_handle_line_from(const char *line, bool from_ble)
+{
+    if (!line || !line[0]) return;
+    s_rx_is_ble = from_ble;
+    if (handle_handshake(line)) return;
+    for (int h = 0; h < s_handler_count; h++) {
+        if (s_handlers[h](line)) return;
+    }
+    parse_pc_data(line);
+}
 
 static bool handle_handshake(const char *line)
 {
@@ -302,18 +462,7 @@ static void usb_rx_task(void *arg)
                         line_buf[line_pos] = '\0';
 
                         /* Try built-in handshake first */
-                        if (!handle_handshake(line_buf)) {
-                            /* Try registered handlers */
-                            bool handled = false;
-                            for (int h = 0; h < s_handler_count && !handled; h++) {
-                                handled = s_handlers[h](line_buf);
-                            }
-
-                            /* If no handler matched, try to parse as PC data */
-                            if (!handled) {
-                                parse_pc_data(line_buf);
-                            }
-                        }
+                        usb_serial_handle_line(line_buf);
 
                         line_pos = 0;
                     }
@@ -346,13 +495,12 @@ static void usb_rx_task(void *arg)
 }
 
 /* Task configuration - matches main_lvgl.c defines */
-#define STACK_SIZE_USB_RX   6144    /* Increased for safety */
+#define STACK_SIZE_USB_RX   8192
 #define PRIO_USB_RX         4       /* Highest priority */
 
 void usb_serial_start_rx_task(SemaphoreHandle_t stats_mutex)
 {
     s_stats_mutex = stats_mutex;
-    s_last_data_ms = (uint32_t)(esp_timer_get_time() / 1000);
 
     /* Create USB RX task with hardened configuration */
     xTaskCreate(usb_rx_task, "usb_rx", STACK_SIZE_USB_RX, NULL, PRIO_USB_RX, NULL);

@@ -4,9 +4,11 @@ idf_component_register(
         "main_lvgl.c"
 
         # Drivers
-        "lvgl_gc9a01_driver.c"
         "drivers/usb_serial_comm.c"
+        "drivers/ble_link.c"
         "drivers/fw_update.c"
+        "drivers/display_board.c"
+        "drivers/power_axp.c"
 
         # Storage modules
         "storage/storage_mgr.c"
@@ -18,6 +20,8 @@ idf_component_register(
         "ui/screensaver_mgr.c"
 
         # Screen implementations
+        "screens/screen_weather_lvgl.c"
+        "screens/screen_clock_lvgl.c"
         "screens/screen_cpu_lvgl.c"
         "screens/screen_gpu_lvgl.c"
         "screens/screen_ram_lvgl.c"
@@ -39,10 +43,16 @@ idf_component_register(
 
     REQUIRES
         lvgl
-        esp_lcd
+        esp_timer
         driver
+        bt
+        nvs_flash
         app_update
         esp_app_format
+        esp_lcd
+        espressif__esp_lcd_co5300
+        espressif__esp_lvgl_adapter
+        waveshare__esp32_s3_touch_amoled_1_75c
 )
 
 # Build the LittleFS image but do NOT flash it with 'idf.py flash'.
@@ -50,5 +60,5 @@ idf_component_register(
 # survive firmware updates. LittleFS auto-formats an empty partition on first
 # boot (format_if_mount_failed=true), so flashing storage.bin is optional.
 # To provision it manually once:
-#   esptool.py write_flash 0x820000 build/storage.bin   (offset: see partitions.csv)
+#   esptool.py write_flash 0xC20000 build/storage.bin   (offset: see partitions.csv)
 littlefs_create_partition_image(storage lfs)

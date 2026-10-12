@@ -12,33 +12,31 @@
 
 #include "screens_lvgl.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 /* Widget handles defined in screens_lvgl.h */
 
 /**
  * @brief Create CPU gauge screen
  */
-screen_cpu_t *screen_cpu_create(lv_display_t *disp)
+screen_cpu_t *screen_cpu_create(lv_obj_t *parent)
 {
     screen_cpu_t *s = malloc(sizeof(screen_cpu_t));
-    if (!s) return NULL;
+    if (!s || !parent) {
+        free(s);
+        return NULL;
+    }
 
     s->last_percent = SCREEN_VALUE_SENTINEL;
     s->last_temp = SCREEN_VALUE_SENTINEL;
 
-    /* Set this display as default temporarily to create screen on it */
-    lv_display_t *old_default = lv_display_get_default();
-    lv_display_set_default(disp);
-
-    /* Create screen (will be created on the default display) */
-    s->screen = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(s->screen, lv_color_black(), 0);
+    s->screen = screen_panel_create(parent);
 
     /* ========================================================================
      * ARC WIDGET (Ring Gauge) - SquareLine Studio Design
      * ====================================================================== */
     s->arc = lv_arc_create(s->screen);
-    lv_obj_set_size(s->arc, 200, 200);
+    lv_obj_set_size(s->arc, 452, 452);
     lv_obj_center(s->arc);
 
     /* Remove all interactive flags */
@@ -51,20 +49,20 @@ screen_cpu_t *screen_cpu_create(lv_display_t *disp)
     /* Arc configuration - 0-100 range for CPU percentage */
     lv_arc_set_range(s->arc, 0, 100);
     lv_arc_set_value(s->arc, 0);
-    lv_arc_set_bg_angles(s->arc, 135, 45);  /* Bottom-left to top-right */
+    lv_arc_set_bg_angles(s->arc, 135, 45);
     lv_arc_set_rotation(s->arc, 0);
 
     /* MAIN (background arc) styling - Dark Gray */
     lv_obj_set_style_arc_color(s->arc, lv_color_hex(0x55555C), LV_PART_MAIN);
     lv_obj_set_style_arc_opa(s->arc, 255, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(s->arc, 20, LV_PART_MAIN);
-    lv_obj_set_style_arc_rounded(s->arc, false, LV_PART_MAIN);  /* Sharp edges */
+    lv_obj_set_style_arc_width(s->arc, 40, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(s->arc, true, LV_PART_MAIN);
 
     /* INDICATOR (progress arc) styling - Intel Blue */
     lv_obj_set_style_arc_color(s->arc, lv_color_hex(0x0071C5), LV_PART_INDICATOR);
     lv_obj_set_style_arc_opa(s->arc, 255, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(s->arc, 20, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_rounded(s->arc, false, LV_PART_INDICATOR);  /* Sharp edges */
+    lv_obj_set_style_arc_width(s->arc, 40, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(s->arc, true, LV_PART_INDICATOR);
 
     /* KNOB (center dot) - Hide it */
     lv_obj_set_style_opa(s->arc, 0, LV_PART_KNOB);
@@ -78,12 +76,14 @@ screen_cpu_t *screen_cpu_create(lv_display_t *disp)
     lv_obj_set_width(s->label_title, LV_SIZE_CONTENT);
     lv_obj_set_height(s->label_title, LV_SIZE_CONTENT);
     lv_obj_set_x(s->label_title, 0);
-    lv_obj_set_y(s->label_title, -45);
+    lv_obj_set_y(s->label_title, -128);
     lv_obj_set_align(s->label_title, LV_ALIGN_CENTER);
-    lv_label_set_text(s->label_title, "i9-7980XE");
+    lv_label_set_text(s->label_title, "CPU");
     lv_obj_set_style_text_color(s->label_title, lv_color_hex(0x0071C5), LV_PART_MAIN | LV_STATE_DEFAULT); // Intel Blue
     lv_obj_set_style_text_align(s->label_title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s->label_title, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s->label_title, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_width(s->label_title, 340);
+    lv_label_set_long_mode(s->label_title, LV_LABEL_LONG_MODE_DOTS);
 
     /* Percentage Value - Center (Y offset 0) */
     s->label_percent = lv_label_create(s->screen);
@@ -101,21 +101,14 @@ screen_cpu_t *screen_cpu_create(lv_display_t *disp)
     lv_obj_set_width(s->label_temp, LV_SIZE_CONTENT);
     lv_obj_set_height(s->label_temp, LV_SIZE_CONTENT);
     lv_obj_set_align(s->label_temp, LV_ALIGN_CENTER);
-    lv_obj_set_pos(s->label_temp, 0, 70);
+    lv_obj_set_pos(s->label_temp, 0, 128);
     lv_label_set_text(s->label_temp, "XX°C");
     lv_obj_set_style_text_color(s->label_temp, lv_color_hex(0xF40B0B), LV_PART_MAIN);  /* Red default */
     lv_obj_set_style_text_opa(s->label_temp, 255, LV_PART_MAIN);
     lv_obj_set_style_text_align(s->label_temp, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_style_text_font(s->label_temp, &lv_font_montserrat_34, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s->label_temp, &lv_font_montserrat_42, LV_PART_MAIN);
 
-    /* Load screen to this display */
-    lv_screen_load(s->screen);
-
-    /* Restore previous default display */
-    if (old_default) {
-        lv_display_set_default(old_default);
-    }
-
+    screen_pass_swipe(s->screen);
     return s;
 }
 

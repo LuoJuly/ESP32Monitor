@@ -11,24 +11,22 @@
 
 #include "screens_lvgl.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 /* Widget handles defined in screens_lvgl.h */
 
-screen_ram_t *screen_ram_create(lv_display_t *disp)
+screen_ram_t *screen_ram_create(lv_obj_t *parent)
 {
     screen_ram_t *s = malloc(sizeof(screen_ram_t));
-    if (!s) return NULL;
+    if (!s || !parent) {
+        free(s);
+        return NULL;
+    }
 
     s->last_used = SCREEN_VALUE_SENTINEL;
     s->last_total = SCREEN_VALUE_SENTINEL;
 
-    /* Set this display as default temporarily */
-    lv_display_t *old_default = lv_display_get_default();
-    lv_display_set_default(disp);
-
-    /* Create screen */
-    s->screen = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(s->screen, lv_color_black(), 0);
+    s->screen = screen_panel_create(parent);
 
     /* ========================================================================
      * LABELS
@@ -38,30 +36,30 @@ screen_ram_t *screen_ram_create(lv_display_t *disp)
     s->label_title = lv_label_create(s->screen);
     lv_label_set_text(s->label_title, "RAM");
     lv_obj_set_style_text_color(s->label_title, lv_color_hex(0xECE81A), LV_PART_MAIN | LV_STATE_DEFAULT); // Corsair Yellow
-    lv_obj_set_style_text_font(s->label_title, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(s->label_title, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(s->label_title, lv_color_make(0x88, 0x88, 0x88), 0);
-    lv_obj_align(s->label_title, LV_ALIGN_TOP_MID, 0, 40);
+    lv_obj_align(s->label_title, LV_ALIGN_TOP_MID, 0, 28);
 
     /* Used RAM Value */
     s->label_value = lv_label_create(s->screen);
     lv_label_set_text(s->label_value, "0.0 GB");
-    lv_obj_set_style_text_font(s->label_value, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_font(s->label_value, &lv_font_montserrat_42, 0);
     lv_obj_set_style_text_color(s->label_value, lv_color_white(), 0);
-    lv_obj_align(s->label_value, LV_ALIGN_CENTER, 0, -30);
+    lv_obj_align(s->label_value, LV_ALIGN_CENTER, 0, -40);
 
     /* Percentage */
     s->label_percent = lv_label_create(s->screen);
     lv_label_set_text(s->label_percent, "0%");
-    lv_obj_set_style_text_font(s->label_percent, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(s->label_percent, &lv_font_montserrat_32, 0);
     lv_obj_set_style_text_color(s->label_percent, lv_color_make(0x43, 0xe9, 0x7b), 0);
-    lv_obj_align(s->label_percent, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(s->label_percent, LV_ALIGN_CENTER, 0, 20);
 
     /* ========================================================================
      * PROGRESS BAR
      * ====================================================================== */
     s->bar = lv_bar_create(s->screen);
-    lv_obj_set_size(s->bar, 180, 25);
-    lv_obj_align(s->bar, LV_ALIGN_CENTER, 0, 30);
+    lv_obj_set_size(s->bar, 430, 48);
+    lv_obj_align(s->bar, LV_ALIGN_CENTER, 0, 70);
 
     lv_bar_set_range(s->bar, 0, 100);
     lv_bar_set_value(s->bar, 0, LV_ANIM_OFF);
@@ -75,18 +73,11 @@ screen_ram_t *screen_ram_create(lv_display_t *disp)
     /* Total RAM */
     s->label_total = lv_label_create(s->screen);
     lv_label_set_text(s->label_total, "von 64 GB");
-    lv_obj_set_style_text_font(s->label_total, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(s->label_total, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(s->label_total, lv_color_make(0x88, 0x88, 0x88), 0);
-    lv_obj_align(s->label_total, LV_ALIGN_CENTER, 0, 60);
+    lv_obj_align(s->label_total, LV_ALIGN_CENTER, 0, 140);
 
-    /* Load screen to this display */
-    lv_screen_load(s->screen);
-
-    /* Restore previous default display */
-    if (old_default) {
-        lv_display_set_default(old_default);
-    }
-
+    screen_pass_swipe(s->screen);
     return s;
 }
 

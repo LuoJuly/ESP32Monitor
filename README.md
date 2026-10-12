@@ -1,227 +1,139 @@
 # Scarab Monitor
 
-**High-Performance Hardware Monitor (Desert-Spec Edition)**
+Real-time PC metrics on a Waveshare ESP32-S3-Touch-AMOLED-1.75C (466×466 CO5300). Swipe between settings, a clock, weather, and CPU, GPU, RAM, and network pages. The PC side is a TrafficMonitor plugin. USB is used when the cable is plugged in; Bluetooth is used when it is not.
 
-Real-time visualization of PC hardware metrics on 4 round GC9A01 displays, powered by ESP32-S3.
+## Screens
 
-![Scarab Monitor (Development Prototype)](https://github.com/user-attachments/assets/937ad4dd-c676-4e93-8e60-af66cce4760b)
-Scarab Monitor (Development Prototype) - Running on ESP32-S3 with GC9A01 Circular Display via USB Serial.
----
+Swipe left or right.
 
-## Why "Desert-Spec"?
+<table>
+  <tr>
+    <td align="center"><b>Settings</b><br>Brightness, auto-switch, USB / Bluetooth / battery<br><img src="docs/screens/settings.png" width="220" alt="Settings"></td>
+    <td align="center"><b>Clock</b><br>Analog face, sun and moon from today's sunrise and sunset<br><img src="docs/screens/clock.png" width="220" alt="Clock"></td>
+    <td align="center"><b>Weather</b><br>Temperature, condition, humidity<br><img src="docs/screens/weather.png" width="220" alt="Weather"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>CPU</b><br>Load and temperature<br><img src="docs/screens/cpu.png" width="220" alt="CPU"></td>
+    <td align="center"><b>GPU</b><br>Load, temperature, VRAM<br><img src="docs/screens/gpu.png" width="220" alt="GPU"></td>
+    <td align="center"><b>RAM</b><br>Used / total<br><img src="docs/screens/ram.png" width="220" alt="RAM"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Network</b><br>Link and live up / down rates<br><img src="docs/screens/network.png" width="220" alt="Network"></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
-This isn't marketing—it's engineering philosophy. Every feature exists because production environments demand it.
+Settings is not part of the automatic cycle. With auto-switch on, the board walks clock → weather → CPU → GPU → RAM → network → clock. The last page and the switch interval are kept in `/storage`.
 
-| Feature | Implementation | Why It Matters |
-|---------|----------------|----------------|
-| **Self-Healing Firmware** | ESP32 Task Watchdog Timer (5s hard-reset on freeze) + Mutex-locking for thread-safety | The system recovers from any firmware hang without user intervention |
-| **Fail-Safe Client** | Automatic fallback to "Lite Mode" (WMI) when admin drivers are blocked | Works in corporate environments with restricted driver policies |
-| **Zero-Config** | Automatic handshake + COM port scanning | No manual port selection, no config files, just plug and play |
-| **Data Integrity** | CRC32 checksums for identity data and image uploads | Corrupt packets are detected and rejected |
+The clock accepts a new time stamp on the first packet, then once an hour, and also when civil time jumps by 2 seconds or more. The stamp is network time at the weather location (Open-Meteo), not the PC clock. Until the first weather sample, the plugin sends the PC's local time. Until sunrise and sunset are known, day and night fall back to 06:00–18:00.
 
----
+## Connection
 
-## Features
+| Path | When it is used |
+|------|-----------------|
+| USB Serial/JTAG | The ESP32 USB device (VID `303A`, PID `1001`) is present. This path wins if both are up. |
+| Bluetooth LE | The cable is unplugged. The board must be on battery. The name is `ESP32Monitor`. |
 
-### Display Screens
+Bluetooth is BLE only (no classic SPP, no new COM port). The first pair shows a 6-digit code on the glass for 30 seconds; type it on the PC. The bond is stored in NVS, so it survives the reset that happens when the USB serial port is opened. After that, switching between USB and Bluetooth does not ask for the code again.
 
-- **CPU**: Load percentage (arc gauge), temperature with color coding
-- **GPU**: Load, temperature, VRAM usage
-- **RAM**: Used/Total with visual progress bar
-- **Network**: Connection type (LAN/WLAN), link speed, live upload/download rates
+A board that was paired before NVS persistence was enabled has to be deleted in Windows and paired once more. That first password is the one that gets stored.
 
-### Operating Modes
+## Communication protocol
 
-| Mode | Requirements | Capabilities |
-|------|--------------|--------------|
-| **Full Mode** | Admin rights | Ring-0 hardware access via LibreHardwareMonitor, accurate CPU/GPU temperatures |
-| **Lite Mode** | Standard user | WMI/PerformanceCounter fallback, CPU temp displays "N/A" |
+USB is 115200 8N1. Bluetooth uses the Nordic UART service (`6E400001-B5A3-F393-E0A9-E50E24DCCA9E`). The text lines are the same on both.
 
-### Reliability Features
+### Handshake
 
-- **Infinite Reconnect**: Auto-reconnects on USB disconnect
-- **Graceful Shutdown**: Clean thread termination, no zombie processes
-- **Smart Port Discovery**: Automatically skips JTAG/Debug COM ports
-- **Screensaver**: Retro game icons after 30s idle
-
----
-
-## Communication Protocol
-
-### Physical Layer
-
-| Parameter | Value |
-|-----------|-------|
-| Interface | USB Serial (UART) |
-| Baud Rate | 115200 |
-| Data Bits | 8 |
-| Parity | None |
-| Stop Bits | 1 |
-
-### Handshake Sequence
+USB accepts this immediately:
 
 ```
-PC  → ESP32:  WHO_ARE_YOU?
-ESP32 → PC:   SCARAB_CLIENT_OK|H:<identity-hash>|V:<fw-version>
+PC    → ESP32:  WHO_ARE_YOU?
+ESP32 → PC:     SCARAB_CLIENT_OK|H:<identity-hash>|V:<fw-version>|N:<name>
 ```
 
-The client scans all COM ports, sends `WHO_ARE_YOU?`, and waits for the correct response. No manual port configuration required. The `|V:` field (firmware version) was added in v2.4; the client tolerates its absence on older firmware.
+On Bluetooth the board ignores lines until the link is encrypted. It then notifies `BLE_OK:<8 hex chars>`. The plugin sends that token back, then `WHO_ARE_YOU?`.
 
-### Data Format
+### Sample line
 
-ASCII-based, newline-terminated (`\n`):
-
-```
-CPU:<load>,CPUT:<temp>,GPU:<load>,GPUT:<temp>,VRAM:<used>/<total>,RAM:<used>/<total>,NET:<type>,SPEED:<speed>,DOWN:<mbps>,UP:<mbps>\n
-```
-
-**Example:**
-```
-CPU:45,CPUT:62.5,GPU:30,GPUT:55.0,VRAM:4.2/12.0,RAM:16.5/32.0,NET:LAN,SPEED:1000 Mbps,DOWN:125.5,UP:10.2
-```
-
-**Special Values:**
-- `-1` = Sensor unavailable (displays "N/A" on screen)
-
-### Firmware Update over USB (v2.4+)
-
-Firmware can be updated directly from the companion app (**Settings → Firmware** tab) — no cable re-flash, no collecting devices. The app pushes the `.bin` from `idf.py build` over the serial link:
+ASCII, one line, newline-terminated:
 
 ```
-PC  → ESP32:  FW_BEGIN:<size>
-ESP32 → PC:   FW_OK:BEGIN
-PC  → ESP32:  FW_DATA:<offset>:<hex>          (1024-byte chunks)
-ESP32 → PC:   FW_OK:DATA:<received>            or FW_ERR:OFFSET:<expected> (client resyncs)
-PC  → ESP32:  FW_END:<crc32>
-ESP32 → PC:   FW_OK:COMPLETE                   → device verifies, switches OTA slot, reboots
+CPU:<load>,CPUT:<temp>,GPU:<load>,GPUT:<temp>,VRAM:<used>/<total>,RAM:<used>/<total>,NET:<type>,SPEED:<speed>,DOWN:<mbps>,UP:<mbps>,WTEMP:<c>,WCODE:<code>,WHUM:<pct>,WCITY:<name>,SRISE:<min>,SSET:<min>,CLK:<yyyy-mm-ddThh:mm:ss>
 ```
 
-The image is written to the inactive OTA slot and validated (CRC32 + ESP-IDF image check) **before** the boot partition is switched — a failed or interrupted transfer leaves the running firmware untouched. The same chunked protocol (with `IMG_` prefix) is used for screensaver image uploads.
+`-1` means the sensor is unavailable. `SRISE` and `SSET` are minutes from midnight at the weather location, or `-1` until known. `PC_SCREEN:0` and `PC_SCREEN:1` blank and wake the panel with the PC monitor.
 
-> **One-time migration:** Devices flashed before v2.4 use a factory-only partition table and need **one final cable flash** (`idf.py flash`) to get the OTA layout. This also relocates the storage partition, so uploaded images/colors must be re-provisioned once via the app. All subsequent updates work over USB serial.
+Weather location is the Windows location when it is within 20 km, otherwise ipwho.is. Sunrise and sunset come from Open-Meteo.
 
----
+### Firmware update over USB
+
+The companion app can push a `.bin` over the serial link (Settings → Firmware). The image is written to the inactive OTA slot and checked before the boot partition changes. A failed transfer leaves the running firmware in place.
+
+```
+PC    → ESP32:  FW_BEGIN:<size>
+ESP32 → PC:     FW_OK:BEGIN
+PC    → ESP32:  FW_DATA:<offset>:<hex>
+ESP32 → PC:     FW_OK:DATA:<received>
+PC    → ESP32:  FW_END:<crc32>
+ESP32 → PC:     FW_OK:COMPLETE
+```
+
+Boards flashed before the OTA partition table need one cable flash (`idf.py flash`). Later updates can use the serial protocol.
 
 ## Hardware
 
-### Components
-
 | Component | Specification |
 |-----------|---------------|
-| MCU | ESP32-S3-DevKitC (8MB PSRAM required) |
-| Displays | 4x GC9A01 240x240 Round LCD (SPI) |
-| Connection | USB-C to PC |
+| Board | [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/) |
+| MCU | ESP32-S3R8, 8 MB octal PSRAM, 32 MB flash |
+| Display | 1.75" 466×466 AMOLED, CO5300, QSPI |
+| Touch | CST9217 (I2C) |
+| Power | AXP2101, USB-C, optional battery |
+| Link | USB Serial/JTAG, or Bluetooth LE |
 
-### Pin Assignment
+QSPI D0–D3 are GPIO4–7, clock GPIO38, CS GPIO12, LCD reset GPIO1. Touch reset is GPIO2, interrupt GPIO11. I2C is SDA GPIO15, SCL GPIO14. Leave those pins alone. Pin and power notes are in [docs/HARDWARE.md](docs/HARDWARE.md).
 
-All displays share the SPI bus:
+## Build
 
-| Signal | GPIO |
-|--------|------|
-| SCK | 4 |
-| MOSI | 5 |
+ESP-IDF 5.5 or newer.
 
-Individual control pins:
-
-| Display | CS | DC | RST |
-|---------|-----|-----|-----|
-| CPU | 12 | 11 | 13 |
-| GPU | 9 | 46 | 10 |
-| RAM | 8 | 18 | 3 |
-| Network | 16 | 15 | 17 |
-
-For detailed wiring instructions, see [docs/HARDWARE.md](docs/HARDWARE.md).
-
----
-
-## Installation
-
-### Windows Client
-
-1. Go to the **Releases** section on the right sidebar
-2. Download the latest `Scarab_Monitor_vX.X.zip`
-3. Extract to desired location (e.g., `C:\Tools\ScarabMonitor\`)
-4. Run `install_autostart.ps1` (Right-click → "Run with PowerShell")
-5. Choose installation mode:
-   - **[1] Full Mode**: Task Scheduler with Admin (recommended)
-   - **[2] Lite Mode**: Registry Run without Admin
-
-### Manual Start
-
-```powershell
-# Run from extracted directory
-.\PCMonitorClient.exe
+```bash
+idf.py set-target esp32s3
+idf.py build
+idf.py -p COM3 flash
 ```
 
-### Tray Icon Status
+`set-target` is only needed the first time. Do not use `idf.py monitor` against this port if a flash is about to start; opening the USB-JTAG port resets the chip.
 
-| Color | Meaning |
-|-------|---------|
-| Red (blinking) | Initializing / Scanning ports |
-| Red (solid) | Disconnected |
-| Yellow | Connected (Lite Mode) |
-| Green | Connected (Full Mode) |
+### TrafficMonitor plugin
 
----
+The plugin sources are in `TrafficMonitorPlugin/`. Build `Esp32Monitor.dll` with MSVC (C++17) and copy it to the TrafficMonitor `plugins` directory, then start TrafficMonitor elevated so CPU temperature can be read. The plugin prefers the USB device when it is present and opens Bluetooth only after the cable is gone.
 
-## Development
+The older tray client is still in `PCMonitorClient/` (`.NET Framework 4.7.2`):
 
-### Windows Client
-
-**Requirements:**
-- Visual Studio 2022 or VS Code
-- .NET Framework 4.7.2 SDK
-
-**Build:**
 ```powershell
 cd PCMonitorClient
 dotnet build -c Release
 ```
 
-**Output:** `PCMonitorClient\bin\Release\net472\`
-
-### ESP32 Firmware
-
-**Requirements:**
-- ESP-IDF 5.x
-- LVGL 9.x (managed via idf_component.yml)
-
-**Build & Flash:**
-```bash
-idf.py build
-idf.py -p COM3 flash monitor
-```
-
----
-
-## Project Structure
+## Project structure
 
 ```
-scarab-monitor/
-├── main/                      # ESP32 Firmware
-│   ├── main_lvgl.c           # Application entry point
-│   ├── lvgl_gc9a01_driver.*  # Display driver
-│   ├── screens/              # LVGL screen implementations
-│   └── images/               # Screensaver assets
-├── PCMonitorClient/          # Windows Tray Client
-│   └── PCMonitorClient/
-│       ├── Program.cs        # Main + TrayContext
-│       ├── HardwareCollector.cs
-│       ├── StatusForm.cs
-│       └── install_autostart.ps1
-├── docs/                     # Documentation
-│   └── HARDWARE.md          # Assembly guide
-├── CMakeLists.txt           # ESP-IDF build config
-├── lv_conf.h                # LVGL configuration
-└── sdkconfig                # ESP-IDF settings
+ESP32Monitor/
+├── main/                         # ESP32 firmware
+│   ├── main_lvgl.c               # Pages, swipe, blanking
+│   ├── screens/                  # Clock, weather, CPU, GPU, RAM, network
+│   └── drivers/                  # Display, USB, BLE, power
+├── TrafficMonitorPlugin/         # Windows plugin (USB, BLE, weather)
+├── PCMonitorClient/              # Older tray client
+├── docs/
+│   ├── HARDWARE.md
+│   └── SOFTWARE.md
+├── CMakeLists.txt
+└── partitions.csv                # Two 6 MB app slots + LittleFS
 ```
-
----
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
-
----
-
-*Scarab Monitor - Desert-Spec Edition*
+MIT License. See [LICENSE](LICENSE).

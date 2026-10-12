@@ -164,17 +164,21 @@ bool hw_identity_handle_command(const char *line)
 
     /* NAME_CPU=<cpu_name> */
     if (strncmp(line, "NAME_CPU=", 9) == 0) {
-        hw_identity_set_cpu_name(line + 9);
-        ESP_LOGI(TAG, "Received CPU name: %s", s_hw_identity.cpu_name);
-        needs_save = true;
-        needs_ui_update = true;
+        if (strcmp(s_hw_identity.cpu_name, line + 9) != 0) {
+            hw_identity_set_cpu_name(line + 9);
+            ESP_LOGI(TAG, "Received CPU name: %s", s_hw_identity.cpu_name);
+            needs_save = true;
+            needs_ui_update = true;
+        }
     }
     /* NAME_GPU=<gpu_name> */
     else if (strncmp(line, "NAME_GPU=", 9) == 0) {
-        hw_identity_set_gpu_name(line + 9);
-        ESP_LOGI(TAG, "Received GPU name: %s", s_hw_identity.gpu_name);
-        needs_save = true;
-        needs_ui_update = true;
+        if (strcmp(s_hw_identity.gpu_name, line + 9) != 0) {
+            hw_identity_set_gpu_name(line + 9);
+            ESP_LOGI(TAG, "Received GPU name: %s", s_hw_identity.gpu_name);
+            needs_save = true;
+            needs_ui_update = true;
+        }
     }
     /* NAME_HASH=<8-char hex> */
     else if (strncmp(line, "NAME_HASH=", 10) == 0) {

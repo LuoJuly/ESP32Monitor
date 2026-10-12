@@ -1,7 +1,7 @@
 /**
  * @file lv_conf.h
- * LVGL Configuration for PC Monitor (4x GC9A01 Displays)
- * ESP32-S3 with PSRAM
+ * LVGL Configuration for PC Monitor
+ * Waveshare ESP32-S3-Touch-AMOLED-1.75C (466x466 CO5300)
  */
 
 #if 1 /* Set to 1 to enable content */
@@ -37,11 +37,10 @@ void *lv_custom_realloc(void *ptr, size_t size);
 /* ============================================================================
  * DISPLAY SETTINGS
  * ========================================================================== */
-#define LV_DPI_DEF 130  /* For 1.28" 240x240 round displays */
+#define LV_DPI_DEF 266  /* 1.75 inch, 466 px */
 
-/* Multiple display instances */
-#define LV_USE_SYSMON 1
-#define LV_USE_PERF_MONITOR 1
+#define LV_USE_SYSMON 0
+#define LV_USE_PERF_MONITOR 0
 
 /* ============================================================================
  * DRAWING & RENDERING
@@ -66,11 +65,11 @@ void *lv_custom_realloc(void *ptr, size_t size);
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_22 1
 #define LV_FONT_MONTSERRAT_24 1
-#define LV_FONT_MONTSERRAT_26 0
+#define LV_FONT_MONTSERRAT_26 1
 #define LV_FONT_MONTSERRAT_28 0
 #define LV_FONT_MONTSERRAT_30 0
 #define LV_FONT_MONTSERRAT_32 1
-#define LV_FONT_MONTSERRAT_34 0
+#define LV_FONT_MONTSERRAT_34 1
 #define LV_FONT_MONTSERRAT_36 0
 #define LV_FONT_MONTSERRAT_38 0
 #define LV_FONT_MONTSERRAT_40 0
@@ -95,7 +94,7 @@ void *lv_custom_realloc(void *ptr, size_t size);
 #define LV_USE_CHECKBOX 0
 #define LV_USE_DROPDOWN 0
 #define LV_USE_ROLLER 0
-#define LV_USE_SLIDER 0
+#define LV_USE_SLIDER 1
 #define LV_USE_TEXTAREA 0
 #define LV_USE_TABLE 0
 #define LV_USE_CALENDAR 0
@@ -145,9 +144,8 @@ void *lv_custom_realloc(void *ptr, size_t size);
 /* ============================================================================
  * TICK INTERFACE
  * ========================================================================== */
-#define LV_TICK_CUSTOM 1
-#define LV_TICK_CUSTOM_INCLUDE "freertos/FreeRTOS.h"
-#define LV_TICK_CUSTOM_SYS_TIME_EXPR (xTaskGetTickCount() * portTICK_PERIOD_MS)
+/* The Waveshare BSP (esp_lv_adapter) owns the LVGL tick. */
+#define LV_TICK_CUSTOM 0
 
 /* ============================================================================
  * OPERATING SYSTEM

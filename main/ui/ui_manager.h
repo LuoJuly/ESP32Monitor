@@ -19,6 +19,8 @@ typedef struct screen_cpu_t screen_cpu_t;
 typedef struct screen_gpu_t screen_gpu_t;
 typedef struct screen_ram_t screen_ram_t;
 typedef struct screen_network_t screen_network_t;
+typedef struct screen_weather_t screen_weather_t;
+typedef struct screen_clock_t screen_clock_t;
 
 /* Screen handles structure */
 typedef struct {
@@ -26,6 +28,8 @@ typedef struct {
     screen_gpu_t *gpu;
     screen_ram_t *ram;
     screen_network_t *network;
+    screen_weather_t *weather;
+    screen_clock_t *clock;
 } ui_screens_t;
 
 /* Screensaver handles structure */
@@ -42,6 +46,8 @@ typedef struct {
     lv_obj_t *gpu;
     lv_obj_t *ram;
     lv_obj_t *net;
+    lv_obj_t *weather;
+    lv_obj_t *clock;
 } ui_status_dots_t;
 
 /* =============================================================================

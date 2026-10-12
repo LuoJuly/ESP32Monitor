@@ -10,32 +10,30 @@
 
 #include "screens_lvgl.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 /* Widget handles defined in screens_lvgl.h */
 
-screen_gpu_t *screen_gpu_create(lv_display_t *disp)
+screen_gpu_t *screen_gpu_create(lv_obj_t *parent)
 {
     screen_gpu_t *s = malloc(sizeof(screen_gpu_t));
-    if (!s) return NULL;
+    if (!s || !parent) {
+        free(s);
+        return NULL;
+    }
 
     s->last_percent = SCREEN_VALUE_SENTINEL;
     s->last_temp = SCREEN_VALUE_SENTINEL;
     s->last_vram_used = SCREEN_VALUE_SENTINEL;
     s->last_vram_total = SCREEN_VALUE_SENTINEL;
 
-    /* Set this display as default temporarily */
-    lv_display_t *old_default = lv_display_get_default();
-    lv_display_set_default(disp);
-
-    /* Create screen */
-    s->screen = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(s->screen, lv_color_black(), 0);
+    s->screen = screen_panel_create(parent);
 
     /* ========================================================================
      * ARC WIDGET (Ring Gauge)
      * ====================================================================== */
     s->arc = lv_arc_create(s->screen);
-    lv_obj_set_size(s->arc, 200, 200);
+    lv_obj_set_size(s->arc, 452, 452);
     lv_obj_center(s->arc);
 
     lv_arc_set_range(s->arc, 0, 100);
@@ -44,12 +42,12 @@ screen_gpu_t *screen_gpu_create(lv_display_t *disp)
     lv_arc_set_rotation(s->arc, 0);
 
     /* Styling - NVIDIA Green (matching Intel Blue style) */
-    lv_obj_set_style_arc_width(s->arc, 20, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(s->arc, 20, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(s->arc, 40, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(s->arc, 40, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(s->arc, lv_color_hex(0x55555C), LV_PART_MAIN);
     lv_obj_set_style_arc_color(s->arc, lv_color_hex(0x76B900), LV_PART_INDICATOR);  /* NVIDIA Green */
-    lv_obj_set_style_arc_rounded(s->arc, false, LV_PART_MAIN);
-    lv_obj_set_style_arc_rounded(s->arc, false, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(s->arc, true, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(s->arc, true, LV_PART_INDICATOR);
 
     lv_obj_set_style_bg_opa(s->arc, 0, LV_PART_KNOB);
 
@@ -62,12 +60,14 @@ screen_gpu_t *screen_gpu_create(lv_display_t *disp)
     lv_obj_set_width(s->label_title, LV_SIZE_CONTENT);
     lv_obj_set_height(s->label_title, LV_SIZE_CONTENT);
     lv_obj_set_x(s->label_title, 0);
-    lv_obj_set_y(s->label_title, -45);
+    lv_obj_set_y(s->label_title, -128);
     lv_obj_set_align(s->label_title, LV_ALIGN_CENTER);
-    lv_label_set_text(s->label_title, "3080 Ti");
+    lv_label_set_text(s->label_title, "GPU");
     lv_obj_set_style_text_color(s->label_title, lv_color_hex(0x76b900), LV_PART_MAIN | LV_STATE_DEFAULT); // NVIDIA Green
     lv_obj_set_style_text_align(s->label_title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s->label_title, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s->label_title, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_width(s->label_title, 340);
+    lv_label_set_long_mode(s->label_title, LV_LABEL_LONG_MODE_DOTS);
 
     /* Percentage Value - Center */
     s->label_percent = lv_label_create(s->screen);
@@ -85,34 +85,27 @@ screen_gpu_t *screen_gpu_create(lv_display_t *disp)
     lv_obj_set_width(s->label_vram, LV_SIZE_CONTENT);
     lv_obj_set_height(s->label_vram, LV_SIZE_CONTENT);
     lv_obj_set_x(s->label_vram, 0);
-    lv_obj_set_y(s->label_vram, 38);
+    lv_obj_set_y(s->label_vram, 62);
     lv_obj_set_align(s->label_vram, LV_ALIGN_CENTER);
     lv_label_set_text(s->label_vram, "12 / 12 GB");
     lv_obj_set_style_text_color(s->label_vram, lv_color_hex(0x4CAF50), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(s->label_vram, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s->label_vram, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s->label_vram, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     /* Temperature - Bottom (matching SquareLine: Y=70) */
     s->label_temp = lv_label_create(s->screen);
     lv_obj_set_width(s->label_temp, LV_SIZE_CONTENT);
     lv_obj_set_height(s->label_temp, LV_SIZE_CONTENT);
     lv_obj_set_x(s->label_temp, 0);
-    lv_obj_set_y(s->label_temp, 70);
+    lv_obj_set_y(s->label_temp, 128);
     lv_obj_set_align(s->label_temp, LV_ALIGN_CENTER);
     lv_label_set_text(s->label_temp, "XX°C");
     lv_obj_set_style_text_color(s->label_temp, lv_color_hex(0xF40B0B), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(s->label_temp, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(s->label_temp, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s->label_temp, &lv_font_montserrat_34, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s->label_temp, &lv_font_montserrat_42, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    /* Load screen to this display */
-    lv_screen_load(s->screen);
-
-    /* Restore previous default display */
-    if (old_default) {
-        lv_display_set_default(old_default);
-    }
-
+    screen_pass_swipe(s->screen);
     return s;
 }
 

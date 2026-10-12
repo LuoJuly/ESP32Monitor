@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.16)
 set(PARTITION_TABLE_CUSTOM_FILENAME "partitions.csv")
 
 # Firmware version reported via handshake and GET_FW_VER (embedded in esp_app_desc)
-set(PROJECT_VER "2.4.0")
+set(PROJECT_VER "2.5.0")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(pc-monitor-poc)
