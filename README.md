@@ -108,7 +108,13 @@ idf.py -p COM3 flash
 
 ### TrafficMonitor plugin
 
-The plugin sources are in `TrafficMonitorPlugin/`. Build `Esp32Monitor.dll` with MSVC (C++17) and copy it to the TrafficMonitor `plugins` directory, then start TrafficMonitor elevated so CPU temperature can be read. The plugin prefers the USB device when it is present and opens Bluetooth only after the cable is gone.
+The plugin project is `TrafficMonitorPlugin/` (`Esp32Bridge.cpp`, `BleClient.cpp`, `WeatherClient.cpp`). It runs inside [TrafficMonitor](https://github.com/zhongyang219/TrafficMonitor). Build `Esp32Monitor.dll` with MSVC (C++17) and place it at:
+
+```
+C:\Program Files\TrafficMonitor\plugins\Esp32Monitor.dll
+```
+
+TrafficMonitor loads plugins from that folder. Leave its `config.ini` unchanged. Start TrafficMonitor elevated so CPU temperature can be read. USB is used when the ESP32 USB device is present; Bluetooth is used when the cable is unplugged.
 
 The older tray client is still in `PCMonitorClient/` (`.NET Framework 4.7.2`):
 
