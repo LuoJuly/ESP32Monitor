@@ -8,25 +8,25 @@ Swipe left or right. Each picture is the round 466 glass, with the bezel around 
 
 <table>
   <tr>
-    <td align="center"><b>Settings</b><br>Brightness, auto-switch, USB / Bluetooth / battery<br><img src="docs/screens/settings.png" width="220" alt="Settings"></td>
-    <td align="center"><b>Clock</b><br>Analog face, sun and moon from today's sunrise and sunset<br><img src="docs/screens/clock.png" width="220" alt="Clock"></td>
-    <td align="center"><b>Weather</b><br>Temperature, condition, humidity<br><img src="docs/screens/weather.png" width="220" alt="Weather"></td>
+    <td width="240" align="center"><b>Settings</b><br>Brightness, auto-switch, USB / Bluetooth / battery<br><img src="docs/screens/settings.png" width="220" height="220" alt="Settings"></td>
+    <td width="240" align="center"><b>Clock</b><br>Analog face inspired by BALMUDA. The center word is THE CLOCK. Sun and moon follow today's sunrise and sunset<br><img src="docs/screens/clock.png" width="220" height="220" alt="Clock"></td>
+    <td width="240" align="center"><b>Weather</b><br>Temperature, condition, humidity<br><img src="docs/screens/weather.png" width="220" height="220" alt="Weather"></td>
   </tr>
   <tr>
-    <td align="center"><b>CPU</b><br>Load and temperature<br><img src="docs/screens/cpu.png" width="220" alt="CPU"></td>
-    <td align="center"><b>GPU</b><br>Load, temperature, VRAM<br><img src="docs/screens/gpu.png" width="220" alt="GPU"></td>
-    <td align="center"><b>RAM</b><br>Used / total<br><img src="docs/screens/ram.png" width="220" alt="RAM"></td>
+    <td width="240" align="center"><b>CPU</b><br>Load and temperature<br><img src="docs/screens/cpu.png" width="220" height="220" alt="CPU"></td>
+    <td width="240" align="center"><b>GPU</b><br>Load, temperature, VRAM<br><img src="docs/screens/gpu.png" width="220" height="220" alt="GPU"></td>
+    <td width="240" align="center"><b>RAM</b><br>Used / total<br><img src="docs/screens/ram.png" width="220" height="220" alt="RAM"></td>
   </tr>
   <tr>
-    <td align="center"><b>Network</b><br>Link and live up / down rates<br><img src="docs/screens/network.png" width="220" alt="Network"></td>
-    <td></td>
-    <td></td>
+    <td width="240" align="center"><b>Network</b><br>Link and live up / down rates<br><img src="docs/screens/network.png" width="220" height="220" alt="Network"></td>
+    <td width="240"></td>
+    <td width="240"></td>
   </tr>
 </table>
 
 Settings is not part of the automatic cycle. With auto-switch on, the board walks clock → weather → CPU → GPU → RAM → network → clock. The last page and the switch interval are kept in `/storage`.
 
-The clock accepts a new time stamp on the first packet, then once an hour, and also when civil time jumps by 2 seconds or more. The stamp is network time at the weather location (Open-Meteo), not the PC clock. Until the first weather sample, the plugin sends the PC's local time. Until sunrise and sunset are known, day and night fall back to 06:00–18:00.
+The face is inspired by BALMUDA. The word in the center is THE CLOCK. The clock accepts a new time stamp on the first packet, then once an hour, and also when civil time jumps by 2 seconds or more. The stamp is network time at the weather location (Open-Meteo), not the PC clock. Until the first weather sample, the plugin sends the PC's local time. Until sunrise and sunset are known, day and night fall back to 06:00–18:00.
 
 ## Connection
 
